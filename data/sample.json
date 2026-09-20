@@ -1,0 +1,9 @@
+{
+  "event_id": "092102-017-sample-001",
+  "event_type": "STANDARD_PROPOSED",
+  "aggregate_type": "standard_revision",
+  "aggregate_id": "precision_nutrition_rd-001",
+  "occurred_at": "2026-09-20T12:00:00+08:00",
+  "version": 1,
+  "summary": "精准营养研发证据链领域样例"
+}
