@@ -1,10 +1,11 @@
 {
   "name": "precision-nutrition-rd",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "领域事件基础校验",
+  "description": "精准营养研发证据链：事件契约、只追加存储与证据分级/主张核查/迁移评估策略",
   "scripts": {
-    "test": "node --test"
+    "test": "node --test",
+    "demo": "node src/demo.js"
   }
 }

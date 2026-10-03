@@ -1,56 +1,791 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "精准营养研发证据链领域事件",
+  "description": "事件信封 + 按 event_type 约束的 payload。所有记录只追加；受试者个人身份信息（姓名、证件号、联系方式）不得进入本契约。",
   "type": "object",
-  "required": [
-    "event_id",
-    "event_type",
-    "aggregate_type",
-    "aggregate_id",
-    "occurred_at",
-    "version",
-    "summary"
-  ],
+  "required": ["event_id", "event_type", "aggregate_type", "aggregate_id", "occurred_at", "version", "summary"],
   "properties": {
-    "event_id": {
-      "type": "string",
-      "minLength": 1
+    "event_id": { "type": "string", "minLength": 1 },
+    "event_type": { "$ref": "#/$defs/eventType" },
+    "aggregate_type": { "$ref": "#/$defs/aggregateType" },
+    "aggregate_id": { "type": "string", "minLength": 1 },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "version": { "type": "integer", "minimum": 1 },
+    "summary": { "type": "string", "minLength": 1 },
+    "payload": { "type": "object" },
+    "causation_id": { "type": "string", "description": "触发本事件的事件 id（如供应商变更触发影响评估）" },
+    "correlation_id": { "type": "string", "description": "同一业务流程（如一次标准编制）的关联 id" }
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": { "properties": { "event_type": { "const": "STANDARD_PROPOSED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "standard_revision" },
+          "payload": {
+            "type": "object",
+            "required": ["standard_code", "revision_no", "lifecycle_stage", "proposing_org"],
+            "properties": {
+              "standard_code": { "type": "string", "minLength": 1 },
+              "revision_no": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
+              "lifecycle_stage": { "const": "draft" },
+              "proposing_org": { "type": "string" },
+              "based_on_revision": { "type": "string", "description": "所基于的上一版本；首版为空" },
+              "rationale": { "type": "string" }
+            }
+          }
+        }
+      }
     },
-    "event_type": {
+    {
+      "if": { "properties": { "event_type": { "const": "STANDARD_DRAFT_REVISED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "standard_revision" },
+          "payload": {
+            "type": "object",
+            "required": ["revision_no", "change_note"],
+            "properties": {
+              "revision_no": { "type": "string" },
+              "change_note": { "type": "string" },
+              "affected_clause_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "STANDARD_TRIAL_ISSUED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "standard_revision" },
+          "payload": {
+            "type": "object",
+            "required": ["lifecycle_stage", "trial_period_end"],
+            "properties": {
+              "lifecycle_stage": { "const": "trial" },
+              "trial_period_end": { "type": "string", "format": "date" },
+              "grandfather_policy": { "type": "string", "description": "试行期对已合法旧版的过渡政策说明" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "STANDARD_PUBLISHED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "standard_revision" },
+          "payload": {
+            "type": "object",
+            "required": ["lifecycle_stage", "effective_date"],
+            "properties": {
+              "lifecycle_stage": { "const": "published" },
+              "effective_date": { "type": "string", "format": "date" },
+              "supersedes": { "type": "string", "description": "被替代的正式版本 id（可为空）" },
+              "grandfather_policy": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "STANDARD_SUPERSEDED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "standard_revision" },
+          "payload": {
+            "type": "object",
+            "required": ["superseded_by", "effective_date"],
+            "properties": {
+              "superseded_by": { "type": "string" },
+              "effective_date": { "type": "string", "format": "date" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "CLAUSE_PROPOSED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "standard_clause" },
+          "payload": {
+            "type": "object",
+            "required": ["standard_revision_id", "clause_no", "text", "proposer_org"],
+            "properties": {
+              "standard_revision_id": { "type": "string" },
+              "clause_no": { "type": "string" },
+              "text": { "type": "string" },
+              "proposer_org": { "type": "string" },
+              "proposal_basis": { "type": "array", "items": { "type": "string" }, "description": "支撑条款的证据 id 列表" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "CLAUSE_OBJECTED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "standard_clause" },
+          "payload": {
+            "type": "object",
+            "required": ["standard_revision_id", "reason", "objector_org"],
+            "properties": {
+              "standard_revision_id": { "type": "string" },
+              "reason": { "type": "string" },
+              "objector_org": { "type": "string" },
+              "counter_evidence_ids": { "type": "array", "items": { "type": "string" } },
+              "resolution": { "type": "string", "enum": ["pending", "accepted", "rejected", "compromised", "resolved_by_revision"] }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "CLAUSE_REVISED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "standard_clause" },
+          "payload": {
+            "type": "object",
+            "required": ["standard_revision_id", "text", "change_reason"],
+            "properties": {
+              "standard_revision_id": { "type": "string" },
+              "text": { "type": "string" },
+              "change_reason": { "type": "string" },
+              "responds_to_objection_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "INGREDIENT_SOURCE_REGISTERED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "ingredient_supplier" },
+          "payload": {
+            "type": "object",
+            "required": ["ingredient_name", "supplier_name", "source_spec"],
+            "properties": {
+              "ingredient_name": { "type": "string" },
+              "supplier_name": { "type": "string" },
+              "source_spec": { "type": "object", "description": "产地/品种/工艺等来源规格" },
+              "coi_declaration_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "INGREDIENT_SOURCE_CHANGED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "ingredient_supplier" },
+          "payload": {
+            "type": "object",
+            "required": ["old_source", "new_source", "change_reason"],
+            "properties": {
+              "old_source": { "type": "string" },
+              "new_source": { "type": "string" },
+              "change_reason": { "type": "string" },
+              "equivalence_claim": { "type": "string", "enum": ["identical_spec", "equivalent_tested", "unverified"], "description": "新旧来源等效性主张；unverified 时既有证据全部标记受影响" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "BATCH_TEST_RECORDED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "ingredient_batch" },
+          "payload": {
+            "type": "object",
+            "required": ["batch_no", "supplier_id", "test_report_no", "results"],
+            "properties": {
+              "batch_no": { "type": "string" },
+              "supplier_id": { "type": "string" },
+              "test_report_no": { "type": "string" },
+              "tested_at": { "type": "string", "format": "date-time" },
+              "results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["item", "value", "spec_limit", "conforms"],
+                  "properties": {
+                    "item": { "type": "string" },
+                    "value": { "type": "string" },
+                    "spec_limit": { "type": "string" },
+                    "conforms": { "type": "boolean" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "BATCH_STABILITY_RECORDED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "ingredient_batch" },
+          "payload": {
+            "type": "object",
+            "required": ["batch_no", "condition", "duration_days", "conforms"],
+            "properties": {
+              "batch_no": { "type": "string" },
+              "condition": { "type": "string", "examples": ["加速40°C/75%RH", "长期25°C/60%RH"] },
+              "duration_days": { "type": "integer", "minimum": 0 },
+              "conforms": { "type": "boolean" },
+              "sample_scale": { "type": "string", "enum": ["lab_sample", "pilot", "production_scale"], "description": "小样稳定性不得外推为放大证据" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "POPULATION_ASSUMPTION_SET" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "population_assumption" },
+          "payload": {
+            "type": "object",
+            "required": ["population_label", "inclusion", "exclusion"],
+            "properties": {
+              "population_label": { "type": "string", "description": "如：40-65岁空腹血糖受损人群" },
+              "inclusion": { "type": "array", "items": { "type": "string" } },
+              "exclusion": { "type": "array", "items": { "type": "string" } },
+              "universal_claim_allowed": { "type": "boolean", "const": false, "description": "任何人群假设均不得推出“适合所有人”" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "FORMULA_DESIGNED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "formula_version" },
+          "payload": {
+            "type": "object",
+            "required": ["formula_code", "version_no", "components"],
+            "properties": {
+              "formula_code": { "type": "string" },
+              "version_no": { "type": "string" },
+              "components": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["ingredient_supplier_id", "dose_per_serving", "unit"],
+                  "properties": {
+                    "ingredient_supplier_id": { "type": "string" },
+                    "dose_per_serving": { "type": "number", "exclusiveMinimum": 0 },
+                    "unit": { "type": "string" }
+                  }
+                }
+              },
+              "population_assumption_id": { "type": "string" },
+              "based_on_formula_version": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "FORMULA_FROZEN" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "formula_version" },
+          "payload": {
+            "type": "object",
+            "required": ["frozen_for_purpose"],
+            "properties": {
+              "frozen_for_purpose": { "type": "string", "enum": ["trial", "scale_up", "market_supply"] },
+              "standard_revision_id": { "type": "string", "description": "冻结时所依据的标准版本" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "TRIAL_PROTOCOL_REGISTERED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "trial_protocol" },
+          "payload": {
+            "type": "object",
+            "required": ["formula_version_id", "population_assumption_id", "design", "dose_per_serving", "dose_unit", "observation_period_days", "endpoints"],
+            "properties": {
+              "formula_version_id": { "type": "string" },
+              "population_assumption_id": { "type": "string" },
+              "design": { "type": "string", "enum": ["RCT_double_blind", "RCT_single_blind", "RCT_open", "single_arm", "observational"] },
+              "dose_per_serving": { "type": "number" },
+              "dose_unit": { "type": "string" },
+              "frequency": { "type": "string" },
+              "observation_period_days": { "type": "integer", "minimum": 1 },
+              "endpoints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["endpoint", "endpoint_type"],
+                  "properties": {
+                    "endpoint": { "type": "string" },
+                    "endpoint_type": { "type": "string", "enum": ["primary_efficacy", "secondary_efficacy", "safety", "exploratory"] }
+                  }
+                }
+              },
+              "planned_exclusion_rules": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "SUBJECT_ENROLLED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "subject" },
+          "payload": {
+            "type": "object",
+            "required": ["trial_protocol_id", "pseudonymous_id", "consent_scope", "enrolled_at"],
+            "properties": {
+              "trial_protocol_id": { "type": "string" },
+              "pseudonymous_id": { "type": "string", "description": "研究编码，不含真实身份" },
+              "consent_scope": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["trial_analysis", "safety_followup", "future_secondary_research", "regulatory_inspection"] }
+              },
+              "enrolled_at": { "type": "string", "format": "date-time" },
+              "consent_expires_at": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "SUBJECT_EXCLUDED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "subject" },
+          "payload": {
+            "type": "object",
+            "required": ["trial_protocol_id", "rule_applied"],
+            "properties": {
+              "trial_protocol_id": { "type": "string" },
+              "rule_applied": { "type": "string", "description": "必须命中方案预定的排除规则" },
+              "pre_registered_rule": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "SUBJECT_CONSENT_WITHDRAWN" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "subject" },
+          "payload": {
+            "type": "object",
+            "required": ["withdrawn_scope", "withdrawn_at", "retain_until"],
+            "properties": {
+              "withdrawn_scope": {
+                "type": "array",
+                "items": { "type": "string", "enum": ["trial_analysis", "safety_followup", "future_secondary_research", "regulatory_inspection", "all_new_use"] }
+              },
+              "withdrawn_at": { "type": "string", "format": "date-time" },
+              "retain_until": { "type": ["string", "null"], "format": "date-time", "description": "法规要求保留的既存数据可留存至该日期，但禁止新用途" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "EVIDENCE_ACCEPTED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "study_evidence" },
+          "payload": {
+            "type": "object",
+            "required": ["evidence_tier", "title", "supports_claim_type"],
+            "properties": {
+              "evidence_tier": { "$ref": "#/$defs/evidenceTier" },
+              "title": { "type": "string" },
+              "supports_claim_type": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/claimType" },
+                "description": "该证据等级允许支持的主张类型；传统食养资料不得支持疾病风险降低等人体功效主张"
+              },
+              "trial_protocol_id": { "type": "string" },
+              "formula_version_id": { "type": "string" },
+              "ingredient_supplier_ids": { "type": "array", "items": { "type": "string" } },
+              "population_assumption_id": { "type": "string" },
+              "dose_per_serving": { "type": "number" },
+              "dose_unit": { "type": "string" },
+              "observation_period_days": { "type": "integer" },
+              "endpoint_results": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["endpoint", "statistically_significant", "clinically_meaningful"],
+                  "properties": {
+                    "endpoint": { "type": "string" },
+                    "statistically_significant": { "type": "boolean" },
+                    "clinically_meaningful": { "type": "boolean" }
+                  }
+                }
+              },
+              "n_analyzed": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "SAFETY_EVENT_REPORTED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "safety_event" },
+          "payload": {
+            "type": "object",
+            "required": ["severity", "related_formula_version_id", "reported_at"],
+            "properties": {
+              "severity": { "type": "string", "enum": ["mild", "moderate", "serious", "severe"] },
+              "related_formula_version_id": { "type": "string" },
+              "related_batch_no": { "type": "string" },
+              "reported_at": { "type": "string", "format": "date-time" },
+              "description": { "type": "string" },
+              "causality_assessment": { "type": "string", "enum": ["unassessed", "unrelated", "possible", "probable", "certain"] }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "SAFETY_EVENT_ADJUDICATED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "safety_event" },
+          "payload": {
+            "type": "object",
+            "required": ["causality_assessment", "adjudication"],
+            "properties": {
+              "causality_assessment": { "type": "string", "enum": ["unrelated", "possible", "probable", "certain"] },
+              "adjudication": { "type": "string", "enum": ["dismissed", "label_change", "dose_adjustment", "formula_suspend"] },
+              "adjudicator_org": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "SCALE_UP_VERIFIED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "scale_up_batch" },
+          "payload": {
+            "type": "object",
+            "required": ["formula_version_id", "batch_size", "batch_size_unit", "verified_bounds"],
+            "properties": {
+              "formula_version_id": { "type": "string" },
+              "batch_no": { "type": "string" },
+              "batch_size": { "number": "number" },
+              "batch_size_unit": { "type": "string", "examples": ["kg", "L"] },
+              "process_parameters": { "type": "object" },
+              "verified_bounds": {
+                "type": "object",
+                "required": ["min_batch_size", "max_batch_size"],
+                "properties": {
+                  "min_batch_size": { "type": "number" },
+                  "max_batch_size": { "type": "number" }
+                }
+              },
+              "quality_results_conform": { "type": "boolean" },
+              "evidence_ids_relied_upon": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "CLAIM_DRAFTED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "product_claim" },
+          "payload": {
+            "type": "object",
+            "required": ["claim_text", "claim_type", "target_population", "claimed_dose", "claimed_dose_unit", "claimed_period_days"],
+            "properties": {
+              "claim_text": { "type": "string" },
+              "claim_type": { "$ref": "#/$defs/claimType" },
+              "target_population": { "type": "string", "description": "“all” 表示适合所有人，必然被拒" },
+              "claimed_dose": { "type": "number" },
+              "claimed_dose_unit": { "type": "string" },
+              "claimed_period_days": { "type": "integer" },
+              "formula_version_id": { "type": "string" },
+              "population_assumption_id": { "type": "string" },
+              "commercial_batch_size": { "type": "number", "description": "拟上市生产批量；必须落在放大验证边界内" },
+              "commercial_batch_size_unit": { "type": "string" },
+              "evidence_ids": { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "CLAIM_REVIEWED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "product_claim" },
+          "payload": {
+            "type": "object",
+            "required": ["decision", "findings"],
+            "properties": {
+              "decision": { "type": "string", "enum": ["approved", "rejected", "needs_evidence"] },
+              "findings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["code", "message"],
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "EVIDENCE_TIER_INSUFFICIENT",
+                        "POPULATION_MISMATCH",
+                        "DOSE_MISMATCH",
+                        "PERIOD_EXCEEDS_EVIDENCE",
+                        "UNIVERSAL_CLAIM_FORBIDDEN",
+                        "STALE_EVIDENCE_AFTER_CHANGE",
+                        "SCALE_UP_OUT_OF_BOUNDS",
+                        "UNRESOLVED_SAFETY",
+                        "REVIEWER_CONFLICT_NOT_RECUSAL",
+                        "OK"
+                      ]
+                    },
+                    "message": { "type": "string" },
+                    "evidence_id": { "type": "string" }
+                  }
+                }
+              },
+              "reviewer_org": { "type": "string" },
+              "reviewed_against_standard_revision_id": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "CLAIM_SUSPENDED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "product_claim" },
+          "payload": {
+            "type": "object",
+            "required": ["reason"],
+            "properties": {
+              "reason": { "type": "string" },
+              "trigger_event_id": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "COI_DECLARED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "coi_declaration" },
+          "payload": {
+            "type": "object",
+            "required": ["org", "interest_type", "related_entity", "declared_at"],
+            "properties": {
+              "org": { "type": "string" },
+              "interest_type": { "type": "string", "enum": ["funding", "employment", "equity", "patent", "supplier_relationship", "other"] },
+              "related_entity": { "type": "string" },
+              "declared_at": { "type": "string", "format": "date-time" },
+              "detail": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "RECUSAL_ENFORCED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "coi_declaration" },
+          "payload": {
+            "type": "object",
+            "required": ["org", "scope", "replacement_reviewer_org"],
+            "properties": {
+              "org": { "type": "string" },
+              "scope": { "type": "string", "description": "被回避的条款/审查范围" },
+              "replacement_reviewer_org": { "type": "string" },
+              "coi_declaration_id": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "IMPACT_ASSESSED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "impact_assessment" },
+          "payload": {
+            "type": "object",
+            "required": ["change_event_id", "change_kind", "affected_evidence", "affected_claims", "affected_safety"],
+            "properties": {
+              "change_event_id": { "type": "string" },
+              "change_kind": { "type": "string", "enum": ["ingredient_source", "formula_version"] },
+              "affected_evidence": { "type": "array", "items": { "$ref": "#/$defs/affectedItem" } },
+              "affected_claims": { "type": "array", "items": { "$ref": "#/$defs/affectedItem" } },
+              "affected_safety": { "type": "array", "items": { "$ref": "#/$defs/affectedItem" } },
+              "revalidation_required": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "MIGRATION_ASSESSED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "migration_assessment" },
+          "payload": {
+            "type": "object",
+            "required": ["old_standard_revision_id", "new_standard_revision_id", "items"],
+            "properties": {
+              "old_standard_revision_id": { "type": "string" },
+              "new_standard_revision_id": { "type": "string" },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["formula_version_id", "compliant_at_time", "status", "action"],
+                  "properties": {
+                    "formula_version_id": { "type": "string" },
+                    "compliant_at_time": { "type": "boolean", "description": "按当时有效版本判定，历史不被改写" },
+                    "status": { "type": "string", "enum": ["still_compliant", "grandfathered_with_deadline", "non_compliant_new_production"] },
+                    "deadline": { "type": ["string", "null"], "format": "date" },
+                    "action": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "event_type": { "const": "EVIDENCE_VIEWED" } }, "required": ["event_type"] },
+      "then": {
+        "properties": {
+          "aggregate_type": { "const": "audit_log" },
+          "payload": {
+            "type": "object",
+            "required": ["viewer_org", "purpose", "viewed_at", "de_identified"],
+            "properties": {
+              "viewer_org": { "type": "string" },
+              "purpose": { "type": "string", "enum": ["regulatory_inspection", "internal_audit", "committee_review"] },
+              "viewed_at": { "type": "string", "format": "date-time" },
+              "de_identified": { "type": "boolean", "const": true },
+              "evidence_ids": { "type": "array", "items": { "type": "string" } },
+              "subject_count_released": { "type": "integer", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "eventType": {
       "type": "string",
       "enum": [
         "STANDARD_PROPOSED",
+        "STANDARD_DRAFT_REVISED",
+        "STANDARD_TRIAL_ISSUED",
+        "STANDARD_PUBLISHED",
+        "STANDARD_SUPERSEDED",
+        "CLAUSE_PROPOSED",
+        "CLAUSE_OBJECTED",
+        "CLAUSE_REVISED",
+        "INGREDIENT_SOURCE_REGISTERED",
+        "INGREDIENT_SOURCE_CHANGED",
+        "BATCH_TEST_RECORDED",
+        "BATCH_STABILITY_RECORDED",
+        "POPULATION_ASSUMPTION_SET",
+        "FORMULA_DESIGNED",
         "FORMULA_FROZEN",
+        "TRIAL_PROTOCOL_REGISTERED",
+        "SUBJECT_ENROLLED",
+        "SUBJECT_EXCLUDED",
+        "SUBJECT_CONSENT_WITHDRAWN",
         "EVIDENCE_ACCEPTED",
+        "SAFETY_EVENT_REPORTED",
+        "SAFETY_EVENT_ADJUDICATED",
+        "SCALE_UP_VERIFIED",
+        "CLAIM_DRAFTED",
         "CLAIM_REVIEWED",
-        "STANDARD_PUBLISHED"
+        "CLAIM_SUSPENDED",
+        "COI_DECLARED",
+        "RECUSAL_ENFORCED",
+        "IMPACT_ASSESSED",
+        "MIGRATION_ASSESSED",
+        "EVIDENCE_VIEWED"
       ]
     },
-    "aggregate_type": {
+    "aggregateType": {
       "type": "string",
       "enum": [
         "standard_revision",
+        "standard_clause",
+        "ingredient_supplier",
+        "ingredient_batch",
+        "population_assumption",
         "formula_version",
+        "trial_protocol",
+        "subject",
         "study_evidence",
-        "product_claim"
+        "safety_event",
+        "scale_up_batch",
+        "product_claim",
+        "coi_declaration",
+        "impact_assessment",
+        "migration_assessment",
+        "audit_log"
       ]
     },
-    "aggregate_id": {
+    "evidenceTier": {
       "type": "string",
-      "minLength": 1
+      "description": "证据分级：传统食养资料 < 实验室 < 动物 < 探索性人体 < 关键性人体 < 系统综述；不同等级不得互相替代",
+      "enum": ["traditional", "in_vitro_lab", "animal", "human_exploratory", "human_pivotal", "systematic_review", "post_market_surveillance"]
     },
-    "occurred_at": {
+    "claimType": {
       "type": "string",
-      "format": "date-time"
+      "description": "traditional_nourishment 传统食养；nutrient_content 营养成分含量；structure_function 人体结构/功能；risk_reduction 疾病风险降低；universal_health 全民健康（禁止）；mechanistic_support 仅机制支持，不得单独支撑上市主张",
+      "enum": [
+        "traditional_nourishment",
+        "nutrient_content",
+        "structure_function",
+        "risk_reduction",
+        "universal_health",
+        "mechanistic_support"
+      ]
     },
-    "version": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "summary": {
-      "type": "string",
-      "minLength": 1
+    "affectedItem": {
+      "type": "object",
+      "required": ["id", "impact", "reason"],
+      "properties": {
+        "id": { "type": "string" },
+        "impact": { "type": "string", "enum": ["invalidated", "requires_revalidation", "dose_population_recheck", "monitor"] },
+        "reason": { "type": "string" }
+      }
     }
-  },
-  "additionalProperties": true
+  }
 }

@@ -1,9 +1,25 @@
 {
-  "event_id": "092102-017-sample-001",
-  "event_type": "STANDARD_PROPOSED",
-  "aggregate_type": "standard_revision",
-  "aggregate_id": "precision_nutrition_rd-001",
+  "event_id": "evt-sample-001",
+  "event_type": "EVIDENCE_ACCEPTED",
+  "aggregate_type": "study_evidence",
+  "aggregate_id": "ev-sample-001",
   "occurred_at": "2026-09-20T12:00:00+08:00",
   "version": 1,
-  "summary": "精准营养研发证据链领域样例"
+  "summary": "样例：关键性人体试验证据入库（传统食养与实验室结果不可替代其主张）",
+  "payload": {
+    "evidence_tier": "human_pivotal",
+    "title": "样例 RCT：目标人群、剂量、观察期与主张一致",
+    "supports_claim_type": ["structure_function"],
+    "formula_version_id": "formula-sample-v1",
+    "ingredient_supplier_ids": ["ingredient-sample-001"],
+    "population_assumption_id": "pop-sample-001",
+    "dose_per_serving": 2.0,
+    "dose_unit": "g",
+    "observation_period_days": 84,
+    "endpoint_results": [
+      { "endpoint": "主要功效终点", "statistically_significant": true, "clinically_meaningful": true }
+    ],
+    "n_analyzed": 60
+  },
+  "correlation_id": "corr-sample"
 }
