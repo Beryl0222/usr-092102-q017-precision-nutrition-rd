@@ -1,0 +1,15 @@
+{
+  "event_id": "092102-017-sample-002",
+  "event_type": "CLAIM_REVIEWED",
+  "aggregate_type": "product_claim",
+  "aggregate_id": "claim-yimian-001",
+  "occurred_at": "2026-09-25T15:30:00+08:00",
+  "version": 1,
+  "summary": "主张 CL-1 评审结论：insufficient_evidence",
+  "review": {
+    "claim_id": "CL-1",
+    "status": "insufficient_evidence",
+    "missing_levels": ["human"],
+    "note": "仅有实验室证据，健康宣称需补人体证据；实验室结果不得替代"
+  }
+}

@@ -20,10 +20,25 @@
       "type": "string",
       "enum": [
         "STANDARD_PROPOSED",
+        "OBJECTION_RAISED",
+        "OBJECTION_RESOLVED",
+        "TRIAL_STARTED",
+        "STANDARD_PUBLISHED",
+        "MIGRATION_ASSESSED",
+        "INGREDIENT_BATCH_REGISTERED",
         "FORMULA_FROZEN",
+        "SUPPLIER_CHANGED",
+        "IMPACT_ASSESSED",
+        "PROTOCOL_REGISTERED",
+        "SAMPLE_EXCLUDED",
         "EVIDENCE_ACCEPTED",
+        "SAFETY_EVENT_RECORDED",
+        "SCALE_UP_EVALUATED",
         "CLAIM_REVIEWED",
-        "STANDARD_PUBLISHED"
+        "CONSENT_RECORDED",
+        "SUBJECT_WITHDRAWN",
+        "COI_DISCLOSED",
+        "RECUSAL_EXECUTED"
       ]
     },
     "aggregate_type": {
@@ -31,8 +46,13 @@
       "enum": [
         "standard_revision",
         "formula_version",
+        "ingredient_batch",
+        "study_protocol",
         "study_evidence",
-        "product_claim"
+        "scale_up",
+        "product_claim",
+        "consent",
+        "coi_disclosure"
       ]
     },
     "aggregate_id": {

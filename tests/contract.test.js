@@ -5,6 +5,8 @@ import test from "node:test";
 import { validateEvent } from "../src/validator.js";
 
 test("样例符合领域约定", async () => {
-  const sample = JSON.parse(await readFile(new URL("../data/sample.json", import.meta.url), "utf8"));
-  assert.deepEqual(validateEvent(sample), []);
+  for (const name of ["sample.json", "sample-claim-reviewed.json"]) {
+    const sample = JSON.parse(await readFile(new URL(`../data/${name}`, import.meta.url), "utf8"));
+    assert.deepEqual(validateEvent(sample), [], `${name} 应通过校验`);
+  }
 });
